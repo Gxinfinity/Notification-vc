@@ -2,8 +2,8 @@ from pyrogram import Client
 from pyrogram.raw.types import UpdateGroupCallParticipants
 
 # Your Telegram API credentials
-api_id = 27209067
-api_hash = "0bb2571bd490320a5c9209d4bf07902e"
+api_id = 32218311
+api_hash = "f64e1a0fc206f1ac94d11cc699ad1080"
 
 # Userbot (no bot token)
 app = Client(
