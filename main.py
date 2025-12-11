@@ -4,33 +4,39 @@ api_id = 27209067
 api_hash = "0bb2571bd490320a5c9209d4bf07902e"
 bot_token = ""
 
-app = Client("vc_notify",
-             api_id=api_id,
-             api_hash=api_hash,
-             bot_token=bot_token)
+app = Client(
+    "vc_notify_final",
+    api_id=api_id,
+    api_hash=api_hash,
+    bot_token=bot_token
+)
 
-# VC join event
-@app.on_raw_update()
-async def vc_event_handler(client, update, users, chats):
+# Catch voice chat participant service messages
+@app.on_message(filters.group & filters.service)
+async def vc_join_detector(client, message):
     try:
-        # Only catch voice chat participant updates
-        if update._ == "updateGroupCallParticipants":
-            chat_id = update.chat_id
-            for p in update.participants:
-                if p.just_joined:
-                    u = await app.get_users(p.user_id)
-                    
-                    username_link = (
-                        f"@{u.username}" if u.username
-                        else f"[{u.first_name}](tg://user?id={u.id})"
-                    )
-                    await app.send_message(
-                        chat_id,
-                        f"🎧 **VC Join Alert:** {username_link} VC me join hua!"
-                    )
+        # Only catch "voice chat participant joined" action
+        if message.voice_chat_participants_invited:
+            for user in message.voice_chat_participants_invited.users:
+
+                username_link = (
+                    f"@{user.username}" if user.username
+                    else f"[{user.first_name}](tg://user?id={user.id})"
+                )
+
+                await message.chat.send_message(
+                    f"🎧 **VC Join Alert:** {username_link} VC me join hua!"
+                )
+
+        # Detect single-user join event
+        if message.voice_chat_started or message.video_chat_started:
+            await message.chat.send_message(
+                "🎧 VC Started!"
+            )
+
     except Exception as e:
         print("Error:", e)
 
 
-print("Bot is running…")
+print("BOT RUNNING…")
 app.run()
