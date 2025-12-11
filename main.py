@@ -2,60 +2,62 @@
 import logging
 from datetime import datetime
 import requests
-from pyrogram import Client, errors
+from pyrogram import Client
 from pyrogram.raw.types import UpdateGroupCallParticipants, PeerChannel
 
-# ---------------- CONFIG -----------------
+# ------------ CONFIG ------------
 API_ID = 32218311
 API_HASH = "f64e1a0fc206f1ac94d11cc699ad1080"
-STRING_SESSION = ""        # your session string
-BOT_TOKEN = ""             # optional
+STRING_SESSION = ""            # put your string session here
+BOT_TOKEN = ""                 # optional
+TARGET_GROUP_ID = -1002385742084
+ADMIN_USER_IDS = [7990456522]
+# --------------------------------
 
-TARGET_GROUP_ID = -1002385742084   # VC group
-ADMIN_USER_IDS = [7990456522]      # DM admins
-# -----------------------------------------
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s"
+)
 log = logging.getLogger("vc")
 
-# 🚀 FIX: disable Pyrogram auto-parsers to stop Peer ID crashes
+# Create client (NO extra args)
 app = Client(
-    "vc_fixed",
+    "vc_fixed2",
     api_id=API_ID,
     api_hash=API_HASH,
-    session_string=STRING_SESSION,
-    handle_updates=False,    # <<< MOST IMPORTANT FIX
-    parse_mode=None,
-    workers=1
+    session_string=STRING_SESSION
 )
 
-# Safe bot sender
+
+# BOT sender
 def bot_send(chat, text):
     if not BOT_TOKEN:
         return False
+
     try:
         r = requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
             data={"chat_id": chat, "text": text, "parse_mode": "Markdown"},
-            timeout=5
+            timeout=7
         )
         return r.status_code == 200
-    except:
+    except Exception as e:
+        log.warning("Bot send failed: %s", e)
         return False
 
-# Extract chat_id safely (NO CRASH)
-def safe_chat_id(update):
+
+# Safe extraction of chat_id (raw only)
+def safe_chat(update):
     try:
-        call = update.call
-        peer = getattr(call, "peer", None)
-        if peer and isinstance(peer, PeerChannel):
+        peer = update.call.peer
+        if isinstance(peer, PeerChannel):
             return int(f"-100{peer.channel_id}")
     except:
         return None
     return None
 
-# Format user info
-def format_user(u):
+
+# Format user
+def fmt_user(u):
     uname = f"@{u.username}" if u.username else f"[{u.first_name}](tg://user?id={u.id})"
     return (
         f"👤 **User Joined VC**\n"
@@ -65,14 +67,14 @@ def format_user(u):
         f"Link: tg://user?id={u.id}"
     )
 
-# RAW VC UPDATE HANDLER
+
 @app.on_raw_update()
 async def raw_handler(client, update, users, chats):
 
     if not isinstance(update, UpdateGroupCallParticipants):
         return
 
-    chat_id = safe_chat_id(update)
+    chat_id = safe_chat(update)
     if chat_id != TARGET_GROUP_ID:
         return
 
@@ -85,33 +87,34 @@ async def raw_handler(client, update, users, chats):
         except:
             continue
 
-        ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        time_utc = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
         msg = (
-            f"{format_user(u)}\n\n"
+            f"{fmt_user(u)}\n\n"
             f"Group: `{chat_id}`\n"
-            f"Time: {ts}"
+            f"Time: {time_utc}"
         )
 
-        # SEND TO GROUP
+        # try bot
         if bot_send(chat_id, msg):
-            log.info("Sent via bot")
+            log.info("Group sent via bot")
         else:
             try:
                 await client.send_message(chat_id, msg)
-                log.info("Sent via user fallback")
+                log.info("Group sent via user")
             except Exception as e:
-                log.warning(f"Group send failed: {e}")
+                log.warning("Group send failed: %s", e)
 
-        # DM ADMINS
+        # DM admins
         for admin in ADMIN_USER_IDS:
             try:
                 await client.send_message(admin, msg)
             except:
                 pass
 
-        log.info(f"Handled VC join for {u.id}")
+        log.info("Handled VC join for %s", u.id)
+
 
 if __name__ == "__main__":
-    log.info("🔥 VC Hybrid Userbot Started — Crash-Proof Mode")
+    log.info("🔥 VC Userbot Started - Pyrogram v2 Stable Mode")
     app.run()
