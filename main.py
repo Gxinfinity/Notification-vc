@@ -1,46 +1,36 @@
-from pyrogram import Client
-from pytgcalls import PyTgCalls
-from pytgcalls.types.events import ChatMemberUpdated
-from pytgcalls.types import GroupCallParticipant
-
+from pyrogram import Client, filters
 
 api_id = 27209067
 api_hash = "0bb2571bd490320a5c9209d4bf07902e"
-bot_token = ""   # <-- Yaha apna BOT TOKEN daalo
+bot_token = ""
+
+app = Client("vc_notify",
+             api_id=api_id,
+             api_hash=api_hash,
+             bot_token=bot_token)
+
+# VC join event
+@app.on_raw_update()
+async def vc_event_handler(client, update, users, chats):
+    try:
+        # Only catch voice chat participant updates
+        if update._ == "updateGroupCallParticipants":
+            chat_id = update.chat_id
+            for p in update.participants:
+                if p.just_joined:
+                    u = await app.get_users(p.user_id)
+                    
+                    username_link = (
+                        f"@{u.username}" if u.username
+                        else f"[{u.first_name}](tg://user?id={u.id})"
+                    )
+                    await app.send_message(
+                        chat_id,
+                        f"🎧 **VC Join Alert:** {username_link} VC me join hua!"
+                    )
+    except Exception as e:
+        print("Error:", e)
 
 
-app = Client(
-    "vcbot",
-    api_id=api_id,
-    api_hash=api_hash,
-    bot_token=bot_token
-)
-
-call = PyTgCalls(app)
-
-
-@call.on_chat_member_updated()
-async def vc_listener(_, update: ChatMemberUpdated):
-
-    # Sirf VC join walon ko detect karega
-    if isinstance(update.new_participant, GroupCallParticipant):
-
-        user_id = update.user_id
-        chat_id = update.chat_id
-
-        user = await app.get_users(user_id)
-
-        username = (
-            f"@{user.username}" if user.username
-            else f"[{user.first_name}](tg://user?id={user.id})"
-        )
-
-        msg = f"🎧 **VC Join Alert:** {username} VC me join hua!"
-
-        await app.send_message(chat_id, msg)
-
-
-app.start()
-call.start()
-print("Bot is running...")
-app.idle()
+print("Bot is running…")
+app.run()
