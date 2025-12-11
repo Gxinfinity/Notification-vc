@@ -1,72 +1,73 @@
 from pyrogram import Client
-from pyrogram.raw.types import UpdateGroupCallParticipants, PeerChannel
-import traceback
+from pyrogram.raw.types import (
+    UpdateGroupCallParticipants,
+)
+import asyncio
 
 api_id = 32218311
 api_hash = "f64e1a0fc206f1ac94d11cc699ad1080"
-string_session = "YOUR_SESSION_STRING"
+string_session = "YOUR_SESSION_STRING_HERE"
 
-TARGET_GROUP_ID = -1002385742084   # Your group
+# Your group only
+TARGET_GROUP_ID = -1002385742084
 
 app = Client(
-    "vc_alert",
+    "vc_alert_fixed",
     api_id=api_id,
     api_hash=api_hash,
     session_string=string_session
 )
 
 
-def get_chat_id_from_update(update):
-    try:
-        call = update.call
-        peer = call.call.peer
-        if isinstance(peer, PeerChannel):
-            return int(f"-100{peer.channel_id}")
-    except:
-        return None
-    return None
-
-
 @app.on_raw_update()
-async def raw_handler(client, update, users, chats):
+async def vc_alert_handler(client, update, users, chats):
 
-    # -------- SILENCE ALL ERRORS --------
-    try:
+    # -- Only handle participant events --
+    if not isinstance(update, UpdateGroupCallParticipants):
+        return
 
-        if isinstance(update, UpdateGroupCallParticipants):
+    # Extract chat/channel from raw update (safe way)
+    chat_raw = update.call.default_subscriber and update.call.default_subscriber.peer
 
-            chat_id = get_chat_id_from_update(update)
+    if not chat_raw:
+        return
 
-            if not chat_id:
-                return
+    # Convert raw peer → normal chat_id
+    if hasattr(chat_raw, "channel_id"):
+        chat_id = int(f"-100{chat_raw.channel_id}")
+    elif hasattr(chat_raw, "chat_id"):
+        chat_id = chat_raw.chat_id
+    else:
+        return
 
-            if chat_id != TARGET_GROUP_ID:
-                return
+    # Ignore all other chats
+    if chat_id != TARGET_GROUP_ID:
+        return
 
-            for p in update.participants:
-                if getattr(p, "just_joined", False):
+    # Loop participants
+    for p in update.participants:
+        if getattr(p, "just_joined", False):
 
-                    try:
-                        user = await client.get_users(p.user_id)
-                    except:
-                        continue
+            # Get user info
+            try:
+                u = await client.get_users(p.user_id)
+            except:
+                continue
 
-                    tag = (
-                        f"@{user.username}" if user.username else f"[{user.first_name}](tg://user?id={user.id})"
-                    )
+            if u.username:
+                tag = f"@{u.username}"
+            else:
+                tag = f"[{u.first_name}](tg://user?id={u.id})"
 
-                    try:
-                        await client.send_message(
-                            chat_id,
-                            f"🎧 **VC Join Alert:** {tag} VC me join hua!"
-                        )
-                    except:
-                        pass
-
-    except Exception:
-        # Background update errors ko silent ignore
-        pass
+            # Send message
+            try:
+                await client.send_message(
+                    TARGET_GROUP_ID,
+                    f"🎧 **VC Join Alert:** {tag} VC me join hua!"
+                )
+            except Exception as e:
+                print("Send Error:", e)
 
 
-print("🔥 FINAL VC ALERT BOT RUNNING — NO CRASH, NO PEER ERROR…")
+print("🔥 VC Alert Userbot Running — Only Your Group, No Errors")
 app.run()
