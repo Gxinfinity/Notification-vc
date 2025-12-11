@@ -18,12 +18,15 @@ ADMIN_USER_IDS = [7990456522]      # DM admins
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 log = logging.getLogger("vc")
 
-# Start user client
+# 🚀 FIX: disable Pyrogram auto-parsers to stop Peer ID crashes
 app = Client(
     "vc_fixed",
     api_id=API_ID,
     api_hash=API_HASH,
-    session_string=STRING_SESSION
+    session_string=STRING_SESSION,
+    handle_updates=False,    # <<< MOST IMPORTANT FIX
+    parse_mode=None,
+    workers=1
 )
 
 # Safe bot sender
@@ -40,7 +43,7 @@ def bot_send(chat, text):
     except:
         return False
 
-# Extract chat_id from raw update (NO CRASHING)
+# Extract chat_id safely (NO CRASH)
 def safe_chat_id(update):
     try:
         call = update.call
@@ -52,17 +55,17 @@ def safe_chat_id(update):
     return None
 
 # Format user info
-def user_info(user):
-    uname = f"@{user.username}" if user.username else f"[{user.first_name}](tg://user?id={user.id})"
+def format_user(u):
+    uname = f"@{u.username}" if u.username else f"[{u.first_name}](tg://user?id={u.id})"
     return (
         f"👤 **User Joined VC**\n"
-        f"Name: {user.first_name}\n"
+        f"Name: {u.first_name}\n"
         f"Username: {uname}\n"
-        f"User ID: `{user.id}`\n"
-        f"Link: tg://user?id={user.id}"
+        f"User ID: `{u.id}`\n"
+        f"Link: tg://user?id={u.id}"
     )
 
-# Raw update handler
+# RAW VC UPDATE HANDLER
 @app.on_raw_update()
 async def raw_handler(client, update, users, chats):
 
@@ -85,23 +88,22 @@ async def raw_handler(client, update, users, chats):
         ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
         msg = (
-            f"{user_info(u)}\n\n"
+            f"{format_user(u)}\n\n"
             f"Group: `{chat_id}`\n"
             f"Time: {ts}"
         )
 
-        # 1) Try bot send
-        sent = bot_send(chat_id, msg)
-        if sent:
+        # SEND TO GROUP
+        if bot_send(chat_id, msg):
             log.info("Sent via bot")
         else:
             try:
                 await client.send_message(chat_id, msg)
                 log.info("Sent via user fallback")
             except Exception as e:
-                log.warning("Failed group send: %s", e)
+                log.warning(f"Group send failed: {e}")
 
-        # 2) DM admins
+        # DM ADMINS
         for admin in ADMIN_USER_IDS:
             try:
                 await client.send_message(admin, msg)
@@ -111,5 +113,5 @@ async def raw_handler(client, update, users, chats):
         log.info(f"Handled VC join for {u.id}")
 
 if __name__ == "__main__":
-    log.info("🔥 VC Hybrid Userbot Started — No Crashes Mode")
+    log.info("🔥 VC Hybrid Userbot Started — Crash-Proof Mode")
     app.run()
