@@ -11,6 +11,7 @@ api_hash = "f64e1a0fc206f1ac94d11cc699ad1080"
 
 string_session = "YOUR_SESSION_STRING_HERE"
 
+# Only detect this group
 TARGET_GROUP_ID = -1002385742084
 
 app = Client(
@@ -22,23 +23,33 @@ app = Client(
 
 last_chat_id = None
 
+
 def extract_chat_id(peer):
-    if isinstance(peer, PeerChannel):
-        return int("-100" + str(peer.channel_id))
-    if isinstance(peer, PeerChat):
-        return peer.chat_id
+    """Safely extract chat ID"""
+    try:
+        if isinstance(peer, PeerChannel):
+            return int("-100" + str(peer.channel_id))
+        if isinstance(peer, PeerChat):
+            return peer.chat_id
+    except:
+        return None
     return None
 
 
-@app.on_raw_update()
-async def vc_handler(client, update, users, chats):
+async def safe_handler(client, update, users, chats):
     global last_chat_id
 
+    # -------- Store latest chat id from messages ----------
     if isinstance(update, UpdateNewMessage):
-        cid = extract_chat_id(update.message.peer_id)
-        if cid:
-            last_chat_id = cid
+        try:
+            peer = update.message.peer_id
+            cid = extract_chat_id(peer)
+            if cid:
+                last_chat_id = cid
+        except:
+            return
 
+    # -------- Handle VC participant join ----------
     if isinstance(update, UpdateGroupCallParticipants):
 
         if not last_chat_id:
@@ -51,15 +62,14 @@ async def vc_handler(client, update, users, chats):
 
         for p in update.participants:
             if getattr(p, "just_joined", False):
-
                 try:
-                    u = await client.get_users(p.user_id)
+                    user = await client.get_users(p.user_id)
                 except:
                     continue
 
                 username_link = (
-                    f"@{u.username}" if u.username
-                    else f"[{u.first_name}](tg://user?id={u.id})"
+                    f"@{user.username}" if user.username
+                    else f"[{user.first_name}](tg://user?id={user.id})"
                 )
 
                 await client.send_message(
@@ -67,5 +77,15 @@ async def vc_handler(client, update, users, chats):
                     f"🎧 **VC Join Alert:** {username_link} VC me join hua!"
                 )
 
-print("🔥 VC Alert Userbot Running…")
+
+@app.on_raw_update()
+async def vc_handler(client, update, users, chats):
+    """Wrapper to safely ignore all Pyrogram internal errors."""
+    try:
+        await safe_handler(client, update, users, chats)
+    except Exception:
+        return
+
+
+print("🔥 VC Alert Userbot Running (Crash-Proof)…")
 app.run()
