@@ -4,19 +4,17 @@ from pyrogram.raw.types import (
     UpdateNewMessage,
     PeerChannel,
     PeerChat,
-    PeerUser
 )
 
 api_id = 32218311
 api_hash = "f64e1a0fc206f1ac94d11cc699ad1080"
-string_session = ""
 
-# Only detect this group
+string_session = "YOUR_SESSION_STRING_HERE"
+
 TARGET_GROUP_ID = -1002385742084
 
-
 app = Client(
-    "vc_alert_fixed",
+    name="vc_alert_fixed",
     api_id=api_id,
     api_hash=api_hash,
     session_string=string_session
@@ -24,9 +22,7 @@ app = Client(
 
 last_chat_id = None
 
-
 def extract_chat_id(peer):
-    """Extract chat ID safely from raw peer object."""
     if isinstance(peer, PeerChannel):
         return int("-100" + str(peer.channel_id))
     if isinstance(peer, PeerChat):
@@ -38,26 +34,21 @@ def extract_chat_id(peer):
 async def vc_handler(client, update, users, chats):
     global last_chat_id
 
-    # ---- STEP 1: Track latest chat id from new messages ----
     if isinstance(update, UpdateNewMessage):
-        peer = update.message.peer_id
-        cid = extract_chat_id(peer)
+        cid = extract_chat_id(update.message.peer_id)
         if cid:
             last_chat_id = cid
 
-    # ---- STEP 2: Handle VC participants update ----
     if isinstance(update, UpdateGroupCallParticipants):
 
         if not last_chat_id:
-            return  # still no chat detected
+            return
 
         chat_id = last_chat_id
 
-        # Only your selected group
         if chat_id != TARGET_GROUP_ID:
             return
 
-        # Loop participants
         for p in update.participants:
             if getattr(p, "just_joined", False):
 
@@ -76,6 +67,5 @@ async def vc_handler(client, update, users, chats):
                     f"🎧 **VC Join Alert:** {username_link} VC me join hua!"
                 )
 
-
-print("🔥 VC Alert Userbot Running without errors…")
+print("🔥 VC Alert Userbot Running…")
 app.run()
