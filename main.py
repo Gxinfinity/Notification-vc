@@ -1,11 +1,13 @@
 from pyrogram import Client
 from pytgcalls import PyTgCalls
-from pytgcalls.types import Update
-from pytgcalls.types import UpdateGroupCallParticipants
+from pytgcalls.types.events import ChatMemberUpdated
+from pytgcalls.types import GroupCallParticipant
 
-api_id = 27209067      # Your API ID
-api_hash = "0bb2571bd490320a5c9209d4bf07902e"  
-bot_token = "" 
+
+api_id = 27209067
+api_hash = "0bb2571bd490320a5c9209d4bf07902e"
+bot_token = ""   # <-- Yaha apna BOT TOKEN daalo
+
 
 app = Client(
     "vcbot",
@@ -17,27 +19,25 @@ app = Client(
 call = PyTgCalls(app)
 
 
-@call.on_update()
-async def vc_listener(update: Update):
-    if isinstance(update, UpdateGroupCallParticipants):
-        user = update.participant
+@call.on_chat_member_updated()
+async def vc_listener(_, update: ChatMemberUpdated):
+
+    # Sirf VC join walon ko detect karega
+    if isinstance(update.new_participant, GroupCallParticipant):
+
+        user_id = update.user_id
         chat_id = update.chat_id
 
-        if user and user.user_id:
-            try:
-                # user full info
-                u = await app.get_users(user.user_id)
+        user = await app.get_users(user_id)
 
-                username_link = (
-                    f"@{u.username}" if u.username
-                    else f"[{u.first_name}](tg://user?id={u.id})"
-                )
+        username = (
+            f"@{user.username}" if user.username
+            else f"[{user.first_name}](tg://user?id={user.id})"
+        )
 
-                text = f"🎧 **VC Join Alert:** {username_link} VC me join hua!"
+        msg = f"🎧 **VC Join Alert:** {username} VC me join hua!"
 
-                await app.send_message(chat_id, text)
-            except Exception as e:
-                print("Error:", e)
+        await app.send_message(chat_id, msg)
 
 
 app.start()
