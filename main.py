@@ -1,42 +1,43 @@
-from pyrogram import Client, filters
+from pyrogram import Client
+from pyrogram.raw.types import UpdateGroupCallParticipants
 
+# Your Telegram API credentials
 api_id = 27209067
 api_hash = "0bb2571bd490320a5c9209d4bf07902e"
-bot_token = ""
 
+# Userbot (no bot token)
 app = Client(
-    "vc_notify_final",
+    "userbot_vc_session",
     api_id=api_id,
-    api_hash=api_hash,
-    bot_token=bot_token
+    api_hash=api_hash
 )
 
-# Catch voice chat participant service messages
-@app.on_message(filters.group & filters.service)
-async def vc_join_detector(client, message):
+@app.on_raw_update()
+async def vc_event_handler(client, update, users, chats):
     try:
-        # Only catch "voice chat participant joined" action
-        if message.voice_chat_participants_invited:
-            for user in message.voice_chat_participants_invited.users:
+        # Detect only VC participants update
+        if isinstance(update, UpdateGroupCallParticipants):
 
-                username_link = (
-                    f"@{user.username}" if user.username
-                    else f"[{user.first_name}](tg://user?id={user.id})"
-                )
+            chat_id = update.chat_id
 
-                await message.chat.send_message(
-                    f"🎧 **VC Join Alert:** {username_link} VC me join hua!"
-                )
+            for p in update.participants:
+                if getattr(p, "just_joined", False):
 
-        # Detect single-user join event
-        if message.voice_chat_started or message.video_chat_started:
-            await message.chat.send_message(
-                "🎧 VC Started!"
-            )
+                    u = await client.get_users(p.user_id)
+
+                    username_link = (
+                        f"@{u.username}" if u.username
+                        else f"[{u.first_name}](tg://user?id={u.id})"
+                    )
+
+                    await client.send_message(
+                        chat_id,
+                        f"🎧 **VC Join Alert:** {username_link} VC me join hua!"
+                    )
 
     except Exception as e:
         print("Error:", e)
 
 
-print("BOT RUNNING…")
+print("Userbot is running…")
 app.run()
