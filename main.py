@@ -1,33 +1,39 @@
 from pyrogram import Client
 from pyrogram.raw.types import UpdateGroupCallParticipants
 
-# Your Telegram API credentials
+# ====== CONFIG ======
 api_id = 32218311
 api_hash = "f64e1a0fc206f1ac94d11cc699ad1080"
 
-# Userbot (no bot token)
+# Your string session (PASTE HERE)
+string_session = ""
+# =====================
+
 app = Client(
-    "userbot_vc_session",
+    name="vc_userbot",
     api_id=api_id,
-    api_hash=api_hash
+    api_hash=api_hash,
+    session_string=string_session
 )
 
 @app.on_raw_update()
-async def vc_event_handler(client, update, users, chats):
+async def vc_handler(client, update, users, chats):
     try:
-        # Detect only VC participants update
         if isinstance(update, UpdateGroupCallParticipants):
 
             chat_id = update.chat_id
 
             for p in update.participants:
+
+                # detect new join
                 if getattr(p, "just_joined", False):
 
-                    u = await client.get_users(p.user_id)
+                    user = await client.get_users(p.user_id)
 
                     username_link = (
-                        f"@{u.username}" if u.username
-                        else f"[{u.first_name}](tg://user?id={u.id})"
+                        f"@{user.username}"
+                        if user.username
+                        else f"[{user.first_name}](tg://user?id={user.id})"
                     )
 
                     await client.send_message(
@@ -38,6 +44,5 @@ async def vc_event_handler(client, update, users, chats):
     except Exception as e:
         print("Error:", e)
 
-
-print("Userbot is running…")
+print("🔥 USERBOT VC ALERT IS RUNNING…")
 app.run()
